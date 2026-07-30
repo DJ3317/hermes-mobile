@@ -14,6 +14,7 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
@@ -42,6 +43,10 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
   const clearChat = useChatStore((s) => s.clearChat);
   const setCurrentSessionId = useChatStore((s) => s.setCurrentSessionId);
   const setMessages = useChatStore((s) => s.setMessages);
+
+  // 重命名对话框状态
+  const [renameTarget, setRenameTarget] = useState<{ id: string; currentTitle: string } | null>(null);
+  const [renameText, setRenameText] = useState('');
 
   // 加载会话列表
   const loadSessions = useCallback(async () => {
@@ -101,16 +106,8 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
       {
         text: '重命名',
         onPress: () => {
-          Alert.prompt?.('重命名', '输入新名称', async (newTitle) => {
-            if (newTitle?.trim()) {
-              try {
-                await api.renameSession(session.id, newTitle.trim());
-                loadSessions();
-              } catch (err) {
-                console.warn('Rename failed:', err);
-              }
-            }
-          });
+          setRenameTarget({ id: session.id, currentTitle: session.title });
+          setRenameText(session.title || '');
         },
       },
       {
@@ -209,6 +206,52 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* 重命名对话框 (兼容 Android) */}
+      <Modal
+        visible={renameTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenameTarget(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>重命名</Text>
+            <TextInput
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="输入新名称"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.borderLight, backgroundColor: colors.background }]}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.borderLight }]}
+                onPress={() => setRenameTarget(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  if (renameTarget && renameText.trim()) {
+                    try {
+                      await api.renameSession(renameTarget.id, renameText.trim());
+                      loadSessions();
+                    } catch (err) {
+                      console.warn('Rename failed:', err);
+                    }
+                  }
+                  setRenameTarget(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>确定</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -266,5 +309,43 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    padding: spacing.xl,
+  },
+  modalTitle: {
+    ...typography.subtitle,
+    fontWeight: '700',
+    marginBottom: spacing.lg,
+  },
+  modalInput: {
+    ...typography.body,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+  },
+  modalButton: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  modalButtonText: {
+    ...typography.bodyBold,
   },
 });

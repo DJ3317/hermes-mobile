@@ -2,7 +2,7 @@
  * 设置屏幕 — 网关连接和应用配置
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const [token, setToken] = useState('');
   const [testing, setTesting] = useState(false);
   const [connected, setConnected] = useState(false);
+  const gatewayRef = useRef<GatewayClient | null>(null);
 
   // 加载已保存的配置
   useEffect(() => {
@@ -84,12 +85,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
 
   // 连接 WebSocket
   const handleConnectWS = useCallback(async () => {
+    // 使用 ref 持久化 GatewayClient 实例
     if (connectionStatus === 'connecting' || connectionStatus === 'open') {
       Alert.alert('提示', '已经连接');
       return;
     }
 
+    if (gatewayRef.current) {
+      gatewayRef.current.close();
+    }
     const gw = new GatewayClient();
+    gatewayRef.current = gw;
     gw.onStateChange = (state) => {
       setStatus(state);
     };
@@ -107,7 +113,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   }, [connectionStatus, setStatus]);
 
   const handleDisconnect = useCallback(() => {
-    // 断开连接逻辑 — 需要持有 GatewayClient 实例
+    if (gatewayRef.current) {
+      gatewayRef.current.close();
+      gatewayRef.current = null;
+    }
     setStatus('closed');
     setConnected(false);
   }, [setStatus]);

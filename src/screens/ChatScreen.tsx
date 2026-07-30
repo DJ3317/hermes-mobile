@@ -57,6 +57,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
     }
   }, [messages.length, streamingContent, scrollToBottom]);
 
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 清理定时器防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
   // 发送消息
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || !isConnected) return;
@@ -100,7 +112,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
       session_id: userMsg.session_id,
     });
 
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       if (idx < fullText.length) {
         const chunk = fullText.slice(idx, idx + 3);
         idx += 3;
@@ -111,7 +123,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
           delta: chunk,
         });
       } else {
-        clearInterval(interval);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        intervalRef.current = null;
         handleStreamEvent({
           type: 'message.complete',
           session_id: userMsg.session_id,
