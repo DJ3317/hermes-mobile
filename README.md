@@ -42,21 +42,13 @@ npx expo prebuild --platform android
 cd android && ./gradlew assembleRelease
 ```
 
-## GitHub Actions 构建
-
-每次推送至 `main` 分支或手动触发 workflow，GitHub Actions 会自动构建 APK：
-
-1. 前往仓库的 **Actions** 页面
-2. 选择 **Build Android APK** workflow
-3. 点击 **Run workflow** 手动触发
-4. 构建完成后在 Artifacts 下载 APK
-
 ## 配置后端连接
 
-1. 启动 hermes-agent 后端（默认端口 8081）
-2. 在 APP 的 **设置** 页面输入后端地址（如 `http://192.168.1.100:8081`）
+1. 启动 hermes-agent 后端
+2. 在 APP 的 **设置** 页面输入后端地址（如 `http://192.168.31.250:9191`）
 3. 点击 **测试连接** 确认连通性
-4. 点击 **连接** 建立 WebSocket 通信
+4. 如需认证，输入用户名密码并点击 **登录**
+5. 登录成功后点击 **连接** 建立 WebSocket 通信
 
 ## 项目结构
 
