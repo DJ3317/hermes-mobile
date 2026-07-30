@@ -101,6 +101,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
     // 如果还没有网关实例，创建一个并连接
     try {
       if (!gatewayRef.current || gatewayRef.current.connectionState !== 'open') {
+        // 关闭可能处于 connecting 状态的旧实例
+        if (gatewayRef.current) {
+          gatewayRef.current.close();
+          gatewayRef.current = null;
+        }
         const wsUrl = api.buildWsUrl();
         const token = api.getWsAuthToken();
         const gw = new GatewayClient();
@@ -165,7 +170,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
       handleStreamEvent({
         type: 'error',
         session_id: sessionId,
-        error: (err as Error).message,
+        error: '请求失败，请检查连接后重试',
       });
     }
   }, [currentSessionId, isConnected, addMessage, setCurrentSessionId, handleStreamEvent]);
