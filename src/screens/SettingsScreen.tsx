@@ -44,10 +44,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const useSystemTheme = useConfigStore((s) => s.useSystemTheme);
   const setUseSystemTheme = useConfigStore((s) => s.setUseSystemTheme);
 
-  const [host, setHost] = useState('http://localhost:8081');
+  const [host, setHost] = useState('http://192.168.31.250:9191');
   const [token, setToken] = useState('');
   const [testing, setTesting] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const gatewayRef = useRef<GatewayClient | null>(null);
 
   // 加载已保存的配置
@@ -58,6 +61,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
         setToken(cfg.token ?? '');
       }
     });
+  }, []);
+
+  // 用户名密码登录
+  const handleLogin = useCallback(async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert('提示', '请输入用户名和密码');
+      return;
+    }
+    setLoggingIn(true);
+    try {
+      const config = { host };
+      await api.saveApiConfig(config);
+      const result = await api.login(username.trim(), password.trim());
+      setToken(result.token);
+      setPassword('');
+      Alert.alert('登录成功', '已获取认证 Token');
+    } catch (err) {
+      Alert.alert('登录失败', (err as Error).message);
+    } finally {
+      setLoggingIn(false);
+    }
+  }, [host, username, password]);
+
+  // 退出登录
+  const handleLogout = useCallback(async () => {
+    await api.logout();
+    setToken('');
+    Alert.alert('已退出', '认证 Token 已清除');
   }, []);
 
   // 测试连接
@@ -148,7 +179,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           <TextInput
             value={host}
             onChangeText={setHost}
-            placeholder="http://localhost:8081"
+            placeholder="http://192.168.31.250:9191"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -167,6 +198,51 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             secureTextEntry
             style={[styles.input, { color: colors.text, borderColor: colors.borderLight, backgroundColor: colors.background }]}
           />
+
+          {/* ── 用户名密码登录 ── */}
+          <View style={[styles.loginDivider, { borderColor: colors.borderLight }]} />
+          <Text style={[styles.label, { color: colors.text }]}>或使用用户名密码登录</Text>
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="用户名"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.input, { color: colors.text, borderColor: colors.borderLight, backgroundColor: colors.background }]}
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="密码"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            style={[styles.input, { color: colors.text, borderColor: colors.borderLight, backgroundColor: colors.background }]}
+          />
+          <View style={styles.buttonRow}>
+            {token ? (
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: colors.error }]}
+                onPress={handleLogout}
+              >
+                <Text style={styles.buttonText}>退出登录</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: colors.primary }]}
+                onPress={handleLogin}
+                disabled={loggingIn}
+              >
+                {loggingIn ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>登录</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
@@ -379,6 +455,10 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginTop: spacing.sm,
     textAlign: 'center',
+  },
+  loginDivider: {
+    borderTopWidth: 1,
+    marginVertical: spacing.md,
   },
   settingRow: {
     flexDirection: 'row',

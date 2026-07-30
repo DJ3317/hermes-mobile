@@ -15,7 +15,7 @@ export interface ApiConfig {
   token?: string;
 }
 
-let _config: ApiConfig = { host: 'http://localhost:8081' };
+let _config: ApiConfig = { host: 'http://192.168.31.250:9191' };
 
 /** 保存 API 配置到持久化存储 (host 存 AsyncStorage, token 存 SecureStore) */
 export async function saveApiConfig(config: ApiConfig): Promise<void> {
@@ -110,6 +110,50 @@ export class ApiError extends Error {
 }
 
 // ── API 端点 ──────────────────────────────────────────────
+
+/** 用户登录 — 通过用户名密码获取 Token */
+export async function login(username: string, password: string): Promise<{ token: string; message?: string }> {
+  try {
+    // 尝试标准 login 端点
+    const result = await request<{ token: string; message?: string }>('/api/auth/login', {
+      method: 'POST',
+      body: { username, password },
+      timeout: 10000,
+    });
+    if (result.token) {
+      _config.token = result.token;
+      await saveApiConfig(_config);
+    }
+    return result;
+  } catch (err) {
+    // 如果 /api/auth/login 不存在，尝试 /api/login
+    try {
+      const result = await request<{ token: string; message?: string }>('/api/login', {
+        method: 'POST',
+        body: { username, password },
+        timeout: 10000,
+      });
+      if (result.token) {
+        _config.token = result.token;
+        await saveApiConfig(_config);
+      }
+      return result;
+    } catch {
+      throw err; // 抛出原始错误
+    }
+  }
+}
+
+/** 退出登录 — 清除 Token */
+export async function logout(): Promise<void> {
+  _config.token = undefined;
+  await saveApiConfig({ host: _config.host });
+}
+
+/** 检查当前是否已认证 */
+export function isAuthenticated(): boolean {
+  return !!_config.token;
+}
 
 /** 获取网关状态 */
 export async function getStatus() {
