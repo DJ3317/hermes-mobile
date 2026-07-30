@@ -327,7 +327,7 @@ export async function testConnection(config: ApiConfig): Promise<boolean> {
 
 /** 构建 WebSocket URL — Token 不再拼入 URL 查询参数，而是通过 sub-protocol 传递 */
 export function buildWsUrl(): string {
-  const baseUrl = _config.host.replace(/^http/, 'ws');
+  const baseUrl = _config.host.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
   const path = '/api/ws';
   // 注意：Token 通过 WebSocket sub-protocol 头传递，不在 URL 中明文出现
   return `${baseUrl}${path}`;

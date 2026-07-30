@@ -78,7 +78,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
       setPassword('');
       Alert.alert('登录成功', '已获取认证 Token');
     } catch (err) {
-      Alert.alert('登录失败', (err as Error).message);
+      // 避免向后端泄漏内部错误详情
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('timeout') || message.includes('connect')) {
+        Alert.alert('登录失败', '无法连接到服务器，请检查地址和网络');
+      } else if (message.includes('401') || message.includes('403')) {
+        Alert.alert('登录失败', '用户名或密码错误');
+      } else {
+        Alert.alert('登录失败', '请检查用户名密码和服务器状态');
+      }
     } finally {
       setLoggingIn(false);
     }
