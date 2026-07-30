@@ -1,13 +1,15 @@
 # Hermes Mobile 🚀
 
-基于 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) 桌面客户端的移动端 APP。
+基于 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) 桌面客户端魔改的移动端 APP。
+
+> **开发说明**：本项目是对 Hermes Desktop (Electron + React) 客户端核心功能的移动端适配移植，全部代码由 AI 辅助生成。保留了原桌面客户端的核心架构（JSON-RPC 2.0 over WebSocket 通信、nanostores→Zustand 状态管理模式、React 组件化设计），并针对移动端交互方式进行了全面重构（触屏操作、底部 Tab 导航、响应式布局、原生 UI 组件）。
 
 ## 功能
 
 - 💬 **智能聊天** — WebSocket 实时流式对话，支持工具调用展示
-- 📋 **会话管理** — 对话列表、搜索、归档、删除
+- 📋 **会话管理** — 对话列表、搜索、归档、删除、重命名
 - 🤖 **模型配置** — 多提供商切换（OpenAI、Anthropic、OpenRouter 等）
-- 👤 **Profile 管理** — 多配置文件切换
+- 👤 **Profile 管理** — 多配置文件创建、删除、切换
 - 🧠 **技能管理** — 启用/禁用 AI 技能
 - 🌓 **主题切换** — 浅色/深色/跟随系统
 - 🔌 **后端连接** — 支持 HTTP + WebSocket 连接 hermes-agent
@@ -16,9 +18,10 @@
 
 - **框架**: React Native + Expo 57
 - **语言**: TypeScript
-- **状态管理**: Zustand
+- **状态管理**: Zustand（源自桌面端的 nanostores 模式）
 - **导航**: React Navigation (Bottom Tabs + Stack)
 - **通信**: JSON-RPC 2.0 over WebSocket + REST API
+- **安全存储**: expo-secure-store
 
 ## 最低要求
 
@@ -59,15 +62,25 @@ cd android && ./gradlew assembleRelease
 
 ```
 src/
-├── types/          # 类型定义
-├── theme/          # 主题系统
-├── services/       # API 和 WebSocket 客户端
+├── types/          # 类型定义 (Session, Message, Gateway, etc.)
+├── theme/          # 主题系统 (浅色/深色色板)
+├── services/       # API 客户端 + WebSocket JSON-RPC
 ├── stores/         # Zustand 状态管理
 ├── components/     # 可复用 UI 组件
-├── screens/        # 页面屏幕
-└── navigation/     # 导航配置
+├── screens/        # 页面屏幕 (6个)
+└── navigation/     # 导航配置 (Tab + Stack)
 ```
 
 ## 许可
 
-MIT
+本项目采用 **MIT 许可证**。
+
+### 为什么选择 MIT？
+
+1. **与上游一致** — Hermes Agent 本身使用 MIT 协议，作为其衍生适配项目，选择相同协议保持许可证兼容性
+2. **最大自由度** — MIT 是一种极度宽松的许可协议，允许任何人对代码进行使用、复制、修改、合并、发布、再许可和/或销售
+3. **商业友好** — 不限制商业使用，适合个人开发者和企业
+4. **简约透明** — 协议文本简短明确，易于理解和遵守
+5. **社区惯例** — React Native、Expo 等核心依赖均采用 MIT 或类似宽松协议
+
+> 你可以在遵守 MIT 条款的前提下自由使用、修改和分发此代码。详细的许可条款请参阅 [LICENSE](./LICENSE) 文件。
