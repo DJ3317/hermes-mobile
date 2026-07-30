@@ -21,6 +21,8 @@ import { MessageInput } from '../components/MessageInput';
 import { ConnectionBadge } from '../components/ConnectionBadge';
 import { getColors, resolveColorScheme, spacing, typography } from '../theme/colors';
 import type { Message } from '../types';
+import { GatewayClient } from '../services/gateway';
+import * as api from '../services/api';
 
 interface ChatScreenProps {
   navigation: any;
@@ -58,24 +60,33 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
   }, [messages.length, streamingContent, scrollToBottom]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gatewayRef = useRef<GatewayClient | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
-  // 清理定时器防止内存泄漏
+  // 挂载时建立网关连接，卸载时清理
   useEffect(() => {
     return () => {
+      // 清理事件监听和定时器
+      if (cleanupRef.current) cleanupRef.current();
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      if (gatewayRef.current) {
+        gatewayRef.current.close();
+        gatewayRef.current = null;
+      }
     };
   }, []);
 
-  // 发送消息
+  // 发送消息 — 通过真实 GatewayClient 调用后端
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || !isConnected) return;
 
+    const sessionId = currentSessionId ?? `session-${Date.now()}`;
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
-      session_id: currentSessionId ?? `session-${Date.now()}`,
+      session_id: sessionId,
       role: 'user',
       content: text.trim(),
       created_at: new Date().toISOString(),
@@ -83,60 +94,81 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
 
     addMessage(userMessage);
 
-    // 设置当前 session ID (新对话时)
     if (!currentSessionId) {
-      setCurrentSessionId(userMessage.session_id);
+      setCurrentSessionId(sessionId);
     }
 
-    // 模拟发送到网关并接收流式响应
-    // 实际应用中这里会调用 gateway.request('prompt.submit', ...)
-    // 并通过网关事件处理流式响应
-    simulateStreamingResponse(userMessage);
-  }, [currentSessionId, isConnected, addMessage, setCurrentSessionId]);
+    // 如果还没有网关实例，创建一个并连接
+    try {
+      if (!gatewayRef.current || gatewayRef.current.connectionState !== 'open') {
+        const wsUrl = api.buildWsUrl();
+        const token = api.getWsAuthToken();
+        const gw = new GatewayClient();
+        gatewayRef.current = gw;
 
-  // ⚠️ TODO: 模拟流式响应 — 用于 UI 演示；发布前必须替换为真实 GatewayClient 调用
-  // 实际实现应使用: await gateway.request('prompt.submit', { session_id, text })
-  // 并通过 gateway.on('message.delta', handler) 接收流式事件
-  const simulateStreamingResponse = (userMsg: Message) => {
-    const demoResponses = [
-      '你好！我能帮你做些什么？',
-      '我可以帮你回答问题、编写代码、分析数据等等。',
-      '请随时告诉我你的需求！',
-    ];
-
-    let idx = 0;
-    const fullText = demoResponses.join('\n\n');
-
-    handleStreamEvent({
-      type: 'message.start',
-      session_id: userMsg.session_id,
-    });
-
-    // 清除前一个模拟定时器，防止快速发送多个消息时泄漏
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    intervalRef.current = setInterval(() => {
-      if (idx < fullText.length) {
-        const chunk = fullText.slice(idx, idx + 3);
-        idx += 3;
-        handleStreamEvent({
-          type: 'message.delta',
-          session_id: userMsg.session_id,
-          message_id: `msg-${Date.now()}`,
-          delta: chunk,
+        // 注册流式事件处理
+        const unsubDelta = gw.on('message.delta', (ev) => {
+          handleStreamEvent({
+            type: 'message.delta',
+            session_id: sessionId,
+            message_id: ev.payload?.message_id as string,
+            delta: ev.payload?.text as string,
+          });
         });
-      } else {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        handleStreamEvent({
-          type: 'message.complete',
-          session_id: userMsg.session_id,
-          message_id: `msg-resp-${Date.now()}`,
+
+        const unsubComplete = gw.on('message.complete', (ev) => {
+          handleStreamEvent({
+            type: 'message.complete',
+            session_id: sessionId,
+            message_id: ev.payload?.message_id as string,
+          });
         });
+
+        const unsubError = gw.on('error', (ev) => {
+          handleStreamEvent({
+            type: 'error',
+            session_id: sessionId,
+            error: (ev.payload?.message as string) ?? '未知错误',
+          });
+        });
+
+        cleanupRef.current = () => {
+          unsubDelta();
+          unsubComplete();
+          unsubError();
+        };
+
+        await gw.connect(wsUrl, token ?? undefined);
+
+        // 创建新会话
+        const sessResult = await gw.request<{ session_id: string }>('session.create');
+        if (sessResult?.session_id) {
+          setCurrentSessionId(sessResult.session_id);
+        }
       }
-    }, 30);
-  };
+
+      const gw = gatewayRef.current;
+      if (!gw) return;
+
+      // 发送消息开始流式响应
+      handleStreamEvent({
+        type: 'message.start',
+        session_id: sessionId,
+      });
+
+      // 提交 prompt — 后端会推送 message.delta / message.complete 事件
+      await gw.request('prompt.submit', {
+        session_id: sessionId,
+        text: text.trim(),
+      });
+    } catch (err) {
+      handleStreamEvent({
+        type: 'error',
+        session_id: sessionId,
+        error: (err as Error).message,
+      });
+    }
+  }, [currentSessionId, isConnected, addMessage, setCurrentSessionId, handleStreamEvent]);
 
   // 渲染消息列表
   const renderMessage = ({ item }: { item: Message }) => (
