@@ -5,9 +5,10 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const STORAGE_KEY_HOST = 'hermes:host';
-const STORAGE_KEY_TOKEN = 'hermes:token';
+const SECURE_KEY_TOKEN = 'hermes:token';
 
 export interface ApiConfig {
   host: string;
@@ -16,19 +17,21 @@ export interface ApiConfig {
 
 let _config: ApiConfig = { host: 'http://localhost:8081' };
 
-/** 保存 API 配置到持久化存储 */
+/** 保存 API 配置到持久化存储 (host 存 AsyncStorage, token 存 SecureStore) */
 export async function saveApiConfig(config: ApiConfig): Promise<void> {
   _config = config;
   await AsyncStorage.setItem(STORAGE_KEY_HOST, config.host);
   if (config.token) {
-    await AsyncStorage.setItem(STORAGE_KEY_TOKEN, config.token);
+    await SecureStore.setItemAsync(SECURE_KEY_TOKEN, config.token);
+  } else {
+    await SecureStore.deleteItemAsync(SECURE_KEY_TOKEN).catch(() => {});
   }
 }
 
 /** 从持久化存储加载 API 配置 */
 export async function loadApiConfig(): Promise<ApiConfig | null> {
   const host = await AsyncStorage.getItem(STORAGE_KEY_HOST);
-  const token = await AsyncStorage.getItem(STORAGE_KEY_TOKEN);
+  const token = await SecureStore.getItemAsync(SECURE_KEY_TOKEN).catch(() => null);
   if (!host) return null;
   _config = { host, token: token ?? undefined };
   return _config;
@@ -278,12 +281,17 @@ export async function testConnection(config: ApiConfig): Promise<boolean> {
   }
 }
 
-/** 构建 WebSocket URL */
+/** 构建 WebSocket URL — Token 不再拼入 URL 查询参数，而是通过 sub-protocol 传递 */
 export function buildWsUrl(): string {
   const baseUrl = _config.host.replace(/^http/, 'ws');
   const path = '/api/ws';
-  const tokenParam = _config.token ? `?token=${encodeURIComponent(_config.token)}` : '';
-  return `${baseUrl}${path}${tokenParam}`;
+  // 注意：Token 通过 WebSocket sub-protocol 头传递，不在 URL 中明文出现
+  return `${baseUrl}${path}`;
+}
+
+/** 获取当前 Token (用于 WebSocket sub-protocol 认证) */
+export function getWsAuthToken(): string | null {
+  return _config.token ?? null;
 }
 
 /** 构建 WS 认证参数 */

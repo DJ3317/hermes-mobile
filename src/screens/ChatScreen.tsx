@@ -82,7 +82,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
     simulateStreamingResponse(userMessage);
   }, [currentSessionId, isConnected, addMessage, setCurrentSessionId]);
 
-  // ⚠️ 模拟流式响应 — 用于演示 UI；实际实现需通过 GatewayClient
+  // ⚠️ TODO: 模拟流式响应 — 用于 UI 演示；发布前必须替换为真实 GatewayClient 调用
+  // 实际实现应使用: await gateway.request('prompt.submit', { session_id, text })
+  // 并通过 gateway.on('message.delta', handler) 接收流式事件
   const simulateStreamingResponse = (userMsg: Message) => {
     const demoResponses = [
       '你好！我能帮你做些什么？',

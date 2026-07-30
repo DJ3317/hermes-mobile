@@ -96,7 +96,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
 
     try {
       const wsUrl = api.buildWsUrl();
-      await gw.connect(wsUrl);
+      const token = api.getWsAuthToken();
+      await gw.connect(wsUrl, token ?? undefined);
       setConnected(true);
       Alert.alert('成功', 'WebSocket 连接已建立');
     } catch (err) {

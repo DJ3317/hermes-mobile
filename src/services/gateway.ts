@@ -34,6 +34,9 @@ export class GatewayClient {
   private genericHandlers = new Set<GatewayEventHandler>();
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** 存储的认证 Token */
+  private authToken: string | null = null;
+
   // ── 连接管理 ──
 
   get connectionState(): ConnectionState {
@@ -48,11 +51,12 @@ export class GatewayClient {
   /** 连接状态变化回调 */
   onStateChange: ((state: ConnectionState) => void) | null = null;
 
-  async connect(url: string): Promise<void> {
+  async connect(url: string, token?: string): Promise<void> {
     if (this._connectionState === 'connecting' || this._connectionState === 'open') {
       return;
     }
 
+    this.authToken = token ?? null;
     this.setConnectionState('connecting');
 
     return new Promise<void>((resolve, reject) => {
@@ -62,7 +66,9 @@ export class GatewayClient {
       }, DEFAULT_CONNECT_TIMEOUT);
 
       try {
-        this.ws = new WebSocket(url);
+        // Token 通过 WebSocket sub-protocol 头发送，避免在 URL 中明文暴露
+        const protocols = token ? [token] : [];
+        this.ws = new WebSocket(url, protocols);
       } catch (err) {
         this.setConnectionState('error');
         reject(err instanceof Error ? err : new Error(String(err)));
