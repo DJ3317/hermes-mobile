@@ -112,6 +112,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation }) => {
       session_id: userMsg.session_id,
     });
 
+    // 清除前一个模拟定时器，防止快速发送多个消息时泄漏
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     intervalRef.current = setInterval(() => {
       if (idx < fullText.length) {
         const chunk = fullText.slice(idx, idx + 3);

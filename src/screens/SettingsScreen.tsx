@@ -112,6 +112,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     }
   }, [connectionStatus, setStatus]);
 
+  // 组件卸载时清理 WebSocket 连接，防止泄漏
+  useEffect(() => {
+    return () => {
+      if (gatewayRef.current) {
+        gatewayRef.current.close();
+        gatewayRef.current = null;
+      }
+    };
+  }, []);
+
   const handleDisconnect = useCallback(() => {
     if (gatewayRef.current) {
       gatewayRef.current.close();
